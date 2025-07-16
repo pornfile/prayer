@@ -1,24 +1,21 @@
-import discord
-from discord.ext import commands, tasks
+mport discord
+from discord.ext import tasks
 from discord import app_commands
 from collections import defaultdict
 import asyncio
 from typing import Literal
 
-# Hardcoded token instead of dotenv
-TOKEN = "MTM5NDMzNTA1NTIxMTUyODI2NA.Gz_CT3.6U9Fwy3vrFQHCEge9IujuD99SVitqZhHTtkhvM"
+# Hardcoded token
+TOKEN = ""
 
 intents = discord.Intents.all()
-bot = commands.Bot(command_prefix="!", intents=intents)
-tree = bot.tree
+client = discord.Client(intents=intents)
+tree = app_commands.CommandTree(client)
 
 EMBED_COLOR = 0x2f3136
-
-# Emoji constants
 DENIED_EMOJI = "<:Denied:1394932620952997959>"
 ACCEPTED_EMOJI = "<:Accepted:1394932663952871505>"
 
-# Data stores
 whitelist = set()
 logs_channel = {}
 antinuke_settings = defaultdict(set)
@@ -26,23 +23,15 @@ vanity_protection = {}
 ping_on_join_channels = defaultdict(set)
 
 VALID_ANTINUKE_FEATURES = [
- "ban",
-"kick",
-"deleting roles",
-"adding roles",
-"deleting channels",
-"adding channels",
-"pruning members",
-"adding bots",
-"giving administrator",
-"giving dangerous permissions",
-"vanity protection"
+    "ban", "kick", "deleting roles", "adding roles", "deleting channels", "adding channels",
+    "pruning members", "adding bots", "giving administrator", "giving dangerous permissions",
+    "vanity protection"
 ]
 
 @tasks.loop(seconds=3)
 async def check_vanity():
     for guild_id, protected_vanity in vanity_protection.items():
-        guild = bot.get_guild(guild_id)
+        guild = client.get_guild(guild_id)
         if guild:
             try:
                 current_vanity = (await guild.vanity_invite()).code
@@ -134,7 +123,6 @@ async def antinuke_cmd(interaction: discord.Interaction, action: Literal["enable
             if not vanity:
                 await interaction.response.send_message(embed=discord.Embed(description=f"{DENIED_EMOJI} You must provide the vanity string to protect.", color=EMBED_COLOR))
                 return
-
             vanity_protection[interaction.guild.id] = vanity
             await interaction.response.send_message(embed=discord.Embed(description=f"{ACCEPTED_EMOJI} Vanity protection enabled for `{vanity}`.", color=EMBED_COLOR))
         else:
@@ -177,7 +165,7 @@ async def ping_on_join_cmd(interaction: discord.Interaction, action: app_command
         ping_on_join_channels[interaction.guild.id].discard(channel.id)
         await interaction.response.send_message(embed=discord.Embed(description=f"{DENIED_EMOJI} Ping on join disabled in {channel.mention}.", color=EMBED_COLOR))
 
-@bot.event
+@client.event
 async def on_member_join(member):
     guild = member.guild
     if guild.id not in ping_on_join_channels:
@@ -196,27 +184,22 @@ async def on_member_join(member):
 async def rotate_status():
     statuses = [
         lambda: discord.Activity(type=discord.ActivityType.watching, name="🔗 discord.gg/heck"),
-        lambda: discord.Activity(type=discord.ActivityType.watching, name=f"In {len(bot.guilds)} Servers"),
+        lambda: discord.Activity(type=discord.ActivityType.watching, name=f"In {len(client.guilds)} Servers"),
         lambda: discord.Activity(type=discord.ActivityType.watching, name="Best Vanity Protection Bot")
     ]
     i = 0
-    await bot.wait_until_ready()
-    while not bot.is_closed():
+    await client.wait_until_ready()
+    while not client.is_closed():
         activity = statuses[i % len(statuses)]()
-        await bot.change_presence(status=discord.Status.idle, activity=activity)
+        await client.change_presence(status=discord.Status.idle, activity=activity)
         i += 1
         await asyncio.sleep(120)
 
-@bot.event
+@client.event
 async def on_ready():
-    try:
-        synced = await tree.sync()
-        print(f"Synced {len(synced)} command(s)")
-    except Exception as e:
-        print(f"Failed to sync commands: {e}")
-
+    await tree.sync()
     rotate_status.start()
     check_vanity.start()
-    print(f"Logged in as {bot.user} (rotating idle status)")
+    print(f"Logged in as {client.user}")
 
-bot.run(TOKEN)
+client.run(TOKEN)
