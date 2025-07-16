@@ -5,13 +5,14 @@ from collections import defaultdict
 import asyncio
 from typing import Literal
 
-TOKEN = "MTM5NDMzNTA1NTIxMTUyODI2NA.Gz_CT3.6U9Fwy3vrFQHCEge9IujuD99SVitqZhHTtkhvM"  # Replace with your bot token
+# Hardcoded token instead of dotenv
+TOKEN = "MTM5NDMzNTA1NTIxMTUyODI2NA.Gz_CT3.6U9Fwy3vrFQHCEge9IujuD99SVitqZhHTtkhvM"
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
 
-EMBED_COLOR = 0xD6BCD0
+EMBED_COLOR = 0x2f3136
 
 # Emoji constants
 DENIED_EMOJI = "<:Denied:1394932620952997959>"
@@ -22,23 +23,22 @@ whitelist = set()
 logs_channel = {}
 antinuke_settings = defaultdict(set)
 vanity_protection = {}
-ping_on_join_channels = defaultdict(set)  # For ping on join channels
+ping_on_join_channels = defaultdict(set)
 
 VALID_ANTINUKE_FEATURES = [
-    "ban",
-    "kick",
-    "deleting roles",
-    "adding roles",
-    "deleting channels",
-    "adding channels",
-    "pruning members",
-    "adding bots",
-    "giving administrator",
-    "giving dangerous permissions",
-    "vanity protection"
+ "ban",
+"kick",
+"deleting roles",
+"adding roles",
+"deleting channels",
+"adding channels",
+"pruning members",
+"adding bots",
+"giving administrator",
+"giving dangerous permissions",
+"vanity protection"
 ]
 
-# Vanity monitoring task
 @tasks.loop(seconds=3)
 async def check_vanity():
     for guild_id, protected_vanity in vanity_protection.items():
@@ -50,7 +50,7 @@ async def check_vanity():
                     await guild.edit(vanity_code=protected_vanity)
                     await log_action(guild, f"Vanity URL reset to `{protected_vanity}` by anti-nuke.")
             except Exception:
-                pass  # ignore errors
+                pass
 
 async def log_action(guild, description):
     if guild.id in logs_channel:
@@ -59,13 +59,12 @@ async def log_action(guild, description):
             embed = discord.Embed(title="Anti-Nuke Alert", description=description, color=EMBED_COLOR)
             await chan.send(embed=embed)
 
-# Whitelist commands
 @tree.command(name="whitelist", description="Manage whitelist users")
 @app_commands.describe(action="Add, remove or list users", user="User to add or remove")
 @app_commands.choices(action=[
     app_commands.Choice(name="add", value="add"),
     app_commands.Choice(name="remove", value="remove"),
-    app_commands.Choice(name="list", value="list"),
+    app_commands.Choice(name="list", value="list")
 ])
 async def whitelist_cmd(interaction: discord.Interaction, action: app_commands.Choice[str], user: discord.User = None):
     if interaction.user != interaction.guild.owner:
@@ -86,7 +85,7 @@ async def whitelist_cmd(interaction: discord.Interaction, action: app_commands.C
         whitelist.discard(user.id)
         await interaction.response.send_message(embed=discord.Embed(description=f"{DENIED_EMOJI} Removed {user.mention} from whitelist.", color=EMBED_COLOR))
 
-    else:  # list
+    else:
         if not whitelist:
             await interaction.response.send_message(f"{DENIED_EMOJI} Whitelist is empty.", ephemeral=True)
             return
@@ -94,7 +93,6 @@ async def whitelist_cmd(interaction: discord.Interaction, action: app_commands.C
         embed = discord.Embed(title="Whitelisted Users", description="\n".join(mentions), color=EMBED_COLOR)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# Logs channel setup command
 @tree.command(name="logs", description="Set or view logs channel")
 @app_commands.describe(channel="Channel to set for logs")
 async def logs_cmd(interaction: discord.Interaction, channel: discord.TextChannel = None):
@@ -115,20 +113,10 @@ async def logs_cmd(interaction: discord.Interaction, channel: discord.TextChanne
         else:
             await interaction.response.send_message(f"{DENIED_EMOJI} No logs channel set.", ephemeral=True)
 
-# Antinuke command with full enable/disable options and vanity protection
 @tree.command(name="antinuke", description="Enable or disable anti-nuke features")
-@app_commands.describe(
-    action="Enable or disable a feature",
-    feature="The feature to modify",
-    vanity="Vanity string (required if feature is vanity protection)"
-)
+@app_commands.describe(action="Enable or disable a feature", feature="The feature to modify", vanity="Vanity string (required if feature is vanity protection)")
 @app_commands.choices(feature=[app_commands.Choice(name=f, value=f) for f in VALID_ANTINUKE_FEATURES])
-async def antinuke_cmd(
-    interaction: discord.Interaction,
-    action: Literal["enable", "disable"],
-    feature: app_commands.Choice[str],
-    vanity: str = None
-):
+async def antinuke_cmd(interaction: discord.Interaction, action: Literal["enable", "disable"], feature: app_commands.Choice[str], vanity: str = None):
     if interaction.user != interaction.guild.owner:
         await interaction.response.send_message(f"{DENIED_EMOJI} Only the server owner can use this command.", ephemeral=True)
         return
@@ -147,17 +135,6 @@ async def antinuke_cmd(
                 await interaction.response.send_message(embed=discord.Embed(description=f"{DENIED_EMOJI} You must provide the vanity string to protect.", color=EMBED_COLOR))
                 return
 
-            try:
-                invite = await bot.fetch_invite(vanity)
-                if invite.guild.id != interaction.guild.id:
-                    await interaction.response.send_message(embed=discord.Embed(description=f"{DENIED_EMOJI} That vanity is either taken or banned.", color=EMBED_COLOR))
-                    return
-            except discord.NotFound:
-                pass
-            except discord.HTTPException:
-                await interaction.response.send_message(embed=discord.Embed(description=f"{DENIED_EMOJI} That vanity is either taken or banned.", color=EMBED_COLOR))
-                return
-
             vanity_protection[interaction.guild.id] = vanity
             await interaction.response.send_message(embed=discord.Embed(description=f"{ACCEPTED_EMOJI} Vanity protection enabled for `{vanity}`.", color=EMBED_COLOR))
         else:
@@ -169,7 +146,6 @@ async def antinuke_cmd(
         return
 
     enabled_set = antinuke_settings[interaction.guild.id]
-
     if action == "enable":
         if fname in enabled_set:
             await interaction.response.send_message(embed=discord.Embed(description=f"{DENIED_EMOJI} Antinuke {fname} already enabled.", color=EMBED_COLOR))
@@ -183,15 +159,11 @@ async def antinuke_cmd(
         enabled_set.remove(fname)
         await interaction.response.send_message(embed=discord.Embed(description=f"{ACCEPTED_EMOJI} Antinuke {fname} disabled.", color=EMBED_COLOR))
 
-# Ping-on-join command
 @tree.command(name="ping-on-join", description="Enable or disable ping on member join in specified channels")
-@app_commands.describe(
-    action="Enable or disable pinging",
-    channel="Channel to ping on join"
-)
+@app_commands.describe(action="Enable or disable pinging", channel="Channel to ping on join")
 @app_commands.choices(action=[
     app_commands.Choice(name="enable", value="enable"),
-    app_commands.Choice(name="disable", value="disable"),
+    app_commands.Choice(name="disable", value="disable")
 ])
 async def ping_on_join_cmd(interaction: discord.Interaction, action: app_commands.Choice[str], channel: discord.TextChannel):
     if interaction.user != interaction.guild.owner:
@@ -201,12 +173,10 @@ async def ping_on_join_cmd(interaction: discord.Interaction, action: app_command
     if action.value == "enable":
         ping_on_join_channels[interaction.guild.id].add(channel.id)
         await interaction.response.send_message(embed=discord.Embed(description=f"{ACCEPTED_EMOJI} Ping on join enabled in {channel.mention}.", color=EMBED_COLOR))
-
-    elif action.value == "disable":
+    else:
         ping_on_join_channels[interaction.guild.id].discard(channel.id)
         await interaction.response.send_message(embed=discord.Embed(description=f"{DENIED_EMOJI} Ping on join disabled in {channel.mention}.", color=EMBED_COLOR))
 
-# On member join event to ping and delete quickly
 @bot.event
 async def on_member_join(member):
     guild = member.guild
@@ -217,12 +187,12 @@ async def on_member_join(member):
         if channel:
             try:
                 msg = await channel.send(f"{member.mention}")
-                await asyncio.sleep(0.03)  # 30 ms delay before deleting
+                await asyncio.sleep(0.03)
                 await msg.delete()
             except:
                 pass
 
-# Rotating status task
+@tasks.loop(seconds=120)
 async def rotate_status():
     statuses = [
         lambda: discord.Activity(type=discord.ActivityType.watching, name="🔗 discord.gg/heck"),
@@ -235,7 +205,7 @@ async def rotate_status():
         activity = statuses[i % len(statuses)]()
         await bot.change_presence(status=discord.Status.idle, activity=activity)
         i += 1
-        await asyncio.sleep(120)  # Rotate every 2 minutes
+        await asyncio.sleep(120)
 
 @bot.event
 async def on_ready():
@@ -245,7 +215,7 @@ async def on_ready():
     except Exception as e:
         print(f"Failed to sync commands: {e}")
 
-    bot.loop.create_task(rotate_status())
+    rotate_status.start()
     check_vanity.start()
     print(f"Logged in as {bot.user} (rotating idle status)")
 
